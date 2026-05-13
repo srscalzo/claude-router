@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"c:\\\\Users\\\\srsca\\\\claude-router\" -Force)",
+      "Bash(Select-Object Name, PSIsContainer)",
+      "Bash(Sort-Object Name)",
+      "Skill(claude-api)",
+      "Skill(claude-api:*)",
+      "Bash(git -C \"c:\\\\Users\\\\srsca\\\\claude-router\" log --oneline -5)",
+      "Bash(git -C \"c:\\\\Users\\\\srsca\\\\claude-router\" status)",
+      "Bash(node -e \"const a = require\\('@anthropic-ai/sdk'\\); console.log\\(Object.keys\\(a\\)\\)\")",
+      "Bash(npm show *)",
+      "Bash(npm install *)",
+      "Bash(npx tsc *)",
+      "Bash(npm run *)",
+      "Bash(npm test *)",
+      "Bash(xargs sed -i \"s/from '\\\\\\(\\\\.\\\\.\\\\/[^']*\\\\\\)\\\\.js'/from '\\\\1'/g; s/from '\\\\\\(\\\\.\\\\/[^']*\\\\\\)\\\\.js'/from '\\\\1'/g\")",
+      "Bash(node dist/cli/index.js --help)",
+      "Bash(node dist/cli/index.js stats)"
+    ]
+  }
+}
