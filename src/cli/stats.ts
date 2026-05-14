@@ -1,13 +1,8 @@
 import { Logger } from '../logger';
-import { PRICING } from '../pricing';
 import type { LogEntry, ModelId, StatsReport } from '../types';
 
 function pad(s: string, width: number): string {
   return s.padEnd(width);
-}
-
-function fmt(n: number, decimals = 4): string {
-  return n.toFixed(decimals);
 }
 
 function pct(n: number): string {
@@ -15,69 +10,40 @@ function pct(n: number): string {
 }
 
 export function computeStats(entries: LogEntry[]): StatsReport {
-  if (entries.length === 0) {
-    const zero: StatsReport = {
-      totalRequests: 0,
-      totalCostUsd: 0,
-      estimatedCostSonnet: 0,
-      estimatedCostOpus: 0,
-      savingsVsSonnetUsd: 0,
-      savingsVsSonnetPct: 0,
-      savingsVsOpusUsd: 0,
-      savingsVsOpusPct: 0,
-      modelDistribution: {
-        'claude-haiku-4-5-20251001': 0,
-        'claude-sonnet-4-6': 0,
-        'claude-opus-4-7': 0,
-      },
-      averageLatencyMs: 0,
-    };
-    return zero;
-  }
-
-  const totalCostUsd = entries.reduce((sum, e) => sum + e.cost_usd, 0);
-  const sonnetPricing = PRICING['claude-sonnet-4-6'];
-  const opusPricing = PRICING['claude-opus-4-7'];
-
-  const estimatedCostSonnet = entries.reduce((sum, e) =>
-    sum + (e.input_tokens / 1_000_000) * sonnetPricing.inputPerMillion
-        + (e.output_tokens / 1_000_000) * sonnetPricing.outputPerMillion, 0);
-
-  const estimatedCostOpus = entries.reduce((sum, e) =>
-    sum + (e.input_tokens / 1_000_000) * opusPricing.inputPerMillion
-        + (e.output_tokens / 1_000_000) * opusPricing.outputPerMillion, 0);
-
-  const savingsVsSonnetUsd = estimatedCostSonnet - totalCostUsd;
-  const savingsVsOpusUsd = estimatedCostOpus - totalCostUsd;
-
   const modelDistribution: Record<ModelId, number> = {
     'claude-haiku-4-5-20251001': 0,
     'claude-sonnet-4-6': 0,
     'claude-opus-4-7': 0,
   };
+
+  if (entries.length === 0) {
+    return {
+      totalRequests: 0,
+      totalInputTokens: 0,
+      totalOutputTokens: 0,
+      modelDistribution,
+      averageLatencyMs: 0,
+      totalEscalations: 0,
+    };
+  }
+
   for (const e of entries) {
     modelDistribution[e.model_used] = (modelDistribution[e.model_used] ?? 0) + 1;
   }
 
-  const averageLatencyMs = entries.reduce((sum, e) => sum + e.latency_ms, 0) / entries.length;
-
   return {
     totalRequests: entries.length,
-    totalCostUsd,
-    estimatedCostSonnet,
-    estimatedCostOpus,
-    savingsVsSonnetUsd,
-    savingsVsSonnetPct: estimatedCostSonnet > 0 ? savingsVsSonnetUsd / estimatedCostSonnet : 0,
-    savingsVsOpusUsd,
-    savingsVsOpusPct: estimatedCostOpus > 0 ? savingsVsOpusUsd / estimatedCostOpus : 0,
+    totalInputTokens: entries.reduce((sum, e) => sum + e.input_tokens, 0),
+    totalOutputTokens: entries.reduce((sum, e) => sum + e.output_tokens, 0),
     modelDistribution,
-    averageLatencyMs,
+    averageLatencyMs: entries.reduce((sum, e) => sum + e.latency_ms, 0) / entries.length,
+    totalEscalations: entries.reduce((sum, e) => sum + e.escalations, 0),
   };
 }
 
 function printReport(report: StatsReport): void {
   const line = '─'.repeat(52);
-  console.log('\n Claude Router — Cost Analytics');
+  console.log('\n Claude Router — Usage Analytics');
   console.log(line);
 
   if (report.totalRequests === 0) {
@@ -87,12 +53,9 @@ function printReport(report: StatsReport): void {
   }
 
   console.log(`  ${pad('Total requests:', 28)} ${report.totalRequests}`);
-  console.log(`  ${pad('Actual cost:', 28)} $${fmt(report.totalCostUsd)}`);
-  console.log(`  ${pad('Est. cost (always Sonnet):', 28)} $${fmt(report.estimatedCostSonnet)}`);
-  console.log(`  ${pad('Est. cost (always Opus):', 28)} $${fmt(report.estimatedCostOpus)}`);
-  console.log(line);
-  console.log(`  ${pad('Savings vs Sonnet:', 28)} $${fmt(report.savingsVsSonnetUsd)} (${pct(report.savingsVsSonnetPct)})`);
-  console.log(`  ${pad('Savings vs Opus:', 28)} $${fmt(report.savingsVsOpusUsd)} (${pct(report.savingsVsOpusPct)})`);
+  console.log(`  ${pad('Total input tokens:', 28)} ${report.totalInputTokens.toLocaleString()}`);
+  console.log(`  ${pad('Total output tokens:', 28)} ${report.totalOutputTokens.toLocaleString()}`);
+  console.log(`  ${pad('Total escalations:', 28)} ${report.totalEscalations}`);
   console.log(line);
   console.log('  Model distribution:');
   for (const [model, count] of Object.entries(report.modelDistribution)) {

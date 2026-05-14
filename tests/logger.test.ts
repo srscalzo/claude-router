@@ -16,7 +16,6 @@ function makeEntry(overrides: Partial<LogEntry> = {}): LogEntry {
     latency_ms: 300,
     retries: 0,
     escalations: 0,
-    cost_usd: 0.00028,
     prompt_tier: 1,
     ...overrides,
   };

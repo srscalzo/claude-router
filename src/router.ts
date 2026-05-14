@@ -2,7 +2,7 @@ import Anthropic from '@anthropic-ai/sdk';
 import { classify } from './classifier';
 import { shouldEscalate } from './escalation';
 import { Logger } from './logger';
-import { calculateCost, getNextModel, TIER_TO_MODEL } from './pricing';
+import { getNextModel, TIER_TO_MODEL } from './pricing';
 import type { ModelId, RouterOptions, RouterRunParams } from './types';
 
 export class ClaudeRouter {
@@ -61,7 +61,6 @@ export class ClaudeRouter {
       }
 
       const latencyMs = Date.now() - startTime;
-      const cost = calculateCost(currentModel, response.usage.input_tokens, response.usage.output_tokens);
 
       try {
         await this.logger.write({
@@ -73,7 +72,6 @@ export class ClaudeRouter {
           latency_ms: latencyMs,
           retries: attempts - 1 - escalations,
           escalations,
-          cost_usd: cost,
           prompt_tier: classification.tier,
         });
       } catch {

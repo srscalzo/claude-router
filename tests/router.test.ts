@@ -75,7 +75,7 @@ test('log entry is written after successful run', async () => {
   const raw = fs.readFileSync(logPath, 'utf8');
   const entry = JSON.parse(raw.trim());
   assert.equal(entry.model_used, 'claude-haiku-4-5-20251001');
-  assert.ok(entry.cost_usd > 0);
+  assert.ok(entry.input_tokens > 0);
   assert.ok(entry.latency_ms >= 0);
 
   fs.unlinkSync(logPath);

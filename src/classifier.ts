@@ -16,7 +16,9 @@ function extractText(content: Anthropic.MessageParam['content']): string {
 }
 
 export function classify(params: RouterRunParams): ClassificationResult {
-  const allText = params.messages.map(m => extractText(m.content)).join('\n');
+  // Score code/keywords from user messages only — system prompt is infrastructure context,
+  // not a signal of what the user is actually asking.
+  const messageText = params.messages.map(m => extractText(m.content)).join('\n');
   const systemText = typeof params.system === 'string'
     ? params.system
     : (params.system ?? [])
@@ -24,11 +26,10 @@ export function classify(params: RouterRunParams): ClassificationResult {
         .map(b => b.text)
         .join(' ');
 
-  const totalText = allText + '\n' + systemText;
-  const estimatedTokens = Math.ceil(totalText.length / 4);
-  const hasCode = totalText.includes('```');
-  const lowerText = totalText.toLowerCase();
-  const hasComplexKeywords = COMPLEX_KEYWORDS.some(kw => lowerText.includes(kw));
+  const estimatedTokens = Math.ceil(messageText.length / 4);
+  const hasCode = messageText.includes('```');
+  const lowerMessageText = messageText.toLowerCase();
+  const hasComplexKeywords = COMPLEX_KEYWORDS.some(kw => lowerMessageText.includes(kw));
   const messageCount = params.messages.length;
 
   let score = 0;

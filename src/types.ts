@@ -44,24 +44,14 @@ export interface LogEntry {
   latency_ms: number;
   retries: number;
   escalations: number;
-  cost_usd: number;
   prompt_tier: PromptTier;
-}
-
-export interface ModelPricing {
-  inputPerMillion: number;
-  outputPerMillion: number;
 }
 
 export interface StatsReport {
   totalRequests: number;
-  totalCostUsd: number;
-  estimatedCostSonnet: number;
-  estimatedCostOpus: number;
-  savingsVsSonnetUsd: number;
-  savingsVsSonnetPct: number;
-  savingsVsOpusUsd: number;
-  savingsVsOpusPct: number;
+  totalInputTokens: number;
+  totalOutputTokens: number;
   modelDistribution: Record<ModelId, number>;
   averageLatencyMs: number;
+  totalEscalations: number;
 }
