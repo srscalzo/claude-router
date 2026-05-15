@@ -1,8 +1,8 @@
 # Claude Router
 
-Automatic cost optimization and routing layer for the Anthropic Claude API.
+Automatic model routing and token tracking for the Anthropic Claude API.
 
-Routes every prompt to the cheapest Claude model likely to succeed, escalates if the response is insufficient, and tracks your savings over time.
+Routes every prompt to the cheapest Claude model likely to succeed, escalates if the response is insufficient, and tracks usage over time.
 
 > **Target savings: 20–40% on Claude API spend with no code changes beyond the import.**
 
@@ -34,7 +34,7 @@ Your prompt
 1. **Classify** — Scores the prompt using heuristics: token count, code blocks, complexity keywords (`architect`, `refactor`, `optimize`, …), conversation length, and system prompt size.
 2. **Route** — Picks the cheapest model for the score: Haiku → Sonnet → Opus.
 3. **Escalate** — If the response looks insufficient (too short, contains uncertainty phrases like "I'm not sure"), retries with the next model up.
-4. **Log** — Appends a JSONL record to `~/.claude-router/logs.jsonl` with model, tokens, latency, cost, and escalation count.
+4. **Log** — Appends a JSONL record to `~/.clauderouter/logs.jsonl` with model, tokens, latency, and escalation count.
 
 ---
 
@@ -48,7 +48,7 @@ Your prompt
 ## Installation
 
 ```bash
-npm install claude-router
+npm install clauderouter
 ```
 
 ---
@@ -71,7 +71,7 @@ Or pass it directly to the constructor (see usage below).
 ### Basic — automatic routing
 
 ```typescript
-import { ClaudeRouter } from 'claude-router';
+import { ClaudeRouter } from 'clauderouter';
 
 const router = new ClaudeRouter({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -102,7 +102,7 @@ const response = await client.messages.create({
 });
 
 // After — delete the model field, swap the import
-import { ClaudeRouter } from 'claude-router';
+import { ClaudeRouter } from 'clauderouter';
 const router = new ClaudeRouter({ apiKey: process.env.ANTHROPIC_API_KEY! });
 const response = await router.run({
   //  model: 'claude-sonnet-4-6',  ← remove this line
@@ -168,56 +168,89 @@ const router = new ClaudeRouter({
 
   maxRetries?: number;        // max escalation/retry attempts (default: 2)
   disableEscalation?: boolean;// skip escalation checks entirely (default: false)
-  logPath?: string;           // JSONL log file path (default: ~/.claude-router/logs.jsonl)
+  logPath?: string;           // JSONL log file path (default: ~/.clauderouter/logs.jsonl)
 });
 ```
 
 ---
 
-## Cost Analytics CLI
+## CLI
 
-After making some requests, view your savings:
+Install globally or use `npx`:
 
 ```bash
-npx claude-router stats
+npm install -g clauderouter
+# or
+npx clauderouter <command>
+```
 
-# or, if installed globally / in a project:
+### `ask` — one-shot query
+
+```bash
+claude-router ask "What is the time complexity of quicksort?"
+
+# Force a specific model
+claude-router ask "Refactor this service layer" --model claude-opus-4-7
+
+# Custom log path
+claude-router ask "Hello" --log-path ./my-logs.jsonl
+```
+
+Output goes to stdout; metadata (model, tokens, latency) goes to stderr so you can pipe responses cleanly:
+
+```bash
+claude-router ask "Write a haiku about Go channels" > haiku.txt
+```
+
+### `chat` — interactive session
+
+Starts a persistent session with your project's file tree injected as a cached system prompt. Context is sent once and cached by Anthropic for 5 minutes — subsequent turns cost ~10% of the first turn's price.
+
+```bash
+claude-router chat
+
+# Skip context injection
+claude-router chat --no-context
+
+# Force a model for all turns
+claude-router chat --model claude-sonnet-4-6
+```
+
+Type `exit` or `quit` to end the session. A summary of models used and total tokens is printed on exit.
+
+### `stats` — usage analytics
+
+```bash
 claude-router stats
+
+# Custom log path
+claude-router stats --log-path ./my-logs.jsonl
 ```
 
 Example output:
 
 ```
- Claude Router — Cost Analytics
+ Claude Router — Usage Analytics
 ────────────────────────────────────────────────────────
   Total requests:              42
-  Actual cost:                 $0.0031
-  Est. cost (always Sonnet):   $0.0089
-  Est. cost (always Opus):     $0.0441
-────────────────────────────────────────────────────────
-  Savings vs Sonnet:           $0.0058 (65.2%)
-  Savings vs Opus:             $0.0410 (93.0%)
+  Total input tokens:          18,432
+  Total output tokens:          3,891
 ────────────────────────────────────────────────────────
   Model distribution:
     claude-haiku-4-5-20251001:   35 (83.3%)
     claude-sonnet-4-6:            6 (14.3%)
     claude-opus-4-7:              1 (2.4%)
 ────────────────────────────────────────────────────────
+  Total escalations:           3
   Avg latency:                 412 ms
 ────────────────────────────────────────────────────────
-```
-
-Use a custom log path:
-
-```bash
-claude-router stats --log-path /path/to/logs.jsonl
 ```
 
 ---
 
 ## Log Format
 
-Each request appends one JSON line to `~/.claude-router/logs.jsonl`:
+Each request appends one JSON line to `~/.clauderouter/logs.jsonl`:
 
 ```json
 {
@@ -229,7 +262,6 @@ Each request appends one JSON line to `~/.claude-router/logs.jsonl`:
   "latency_ms": 408,
   "retries": 0,
   "escalations": 0,
-  "cost_usd": 0.000598,
   "prompt_tier": 1
 }
 ```
@@ -237,22 +269,15 @@ Each request appends one JSON line to `~/.claude-router/logs.jsonl`:
 You can pipe it to `jq` for custom queries:
 
 ```bash
-# Average cost per request
-jq -s '[.[].cost_usd] | add / length' ~/.claude-router/logs.jsonl
-
 # All escalated requests
-jq 'select(.escalations > 0)' ~/.claude-router/logs.jsonl
+jq 'select(.escalations > 0)' ~/.clauderouter/logs.jsonl
+
+# Average latency
+jq -s '[.[].latency_ms] | add / length' ~/.clauderouter/logs.jsonl
+
+# Model distribution
+jq -r '.model_used' ~/.clauderouter/logs.jsonl | sort | uniq -c | sort -rn
 ```
-
----
-
-## Model Pricing
-
-| Model | Input | Output |
-|---|---|---|
-| `claude-haiku-4-5-20251001` | $0.80 / M tokens | $4.00 / M tokens |
-| `claude-sonnet-4-6` | $3.00 / M tokens | $15.00 / M tokens |
-| `claude-opus-4-7` | $15.00 / M tokens | $75.00 / M tokens |
 
 ---
 
@@ -276,12 +301,16 @@ src/
 ├── types.ts        # shared interfaces
 ├── classifier.ts   # heuristic complexity scorer
 ├── escalation.ts   # response quality checker
-├── pricing.ts      # model pricing + escalation chain
+├── pricing.ts      # model routing + escalation chain
 ├── logger.ts       # JSONL file writer
 ├── router.ts       # ClaudeRouter class
 └── cli/
-    ├── index.ts    # CLI entrypoint (claude-router stats)
-    └── stats.ts    # analytics aggregator + formatter
+    ├── index.ts    # CLI entrypoint
+    ├── ask.ts      # one-shot query command
+    ├── chat.ts     # interactive session command
+    ├── stats.ts    # analytics aggregator + formatter
+    ├── context.ts  # project file tree builder
+    └── spinner.ts  # terminal animation
 tests/
 ├── classifier.test.ts
 ├── escalation.test.ts

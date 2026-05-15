@@ -3,7 +3,7 @@ import os from 'node:os';
 import path from 'node:path';
 import type { LogEntry } from './types';
 
-const DEFAULT_LOG_PATH = path.join(os.homedir(), '.claude-router', 'logs.jsonl');
+const DEFAULT_LOG_PATH = path.join(os.homedir(), '.clauderouter', 'logs.jsonl');
 
 export class Logger {
   readonly logPath: string;
