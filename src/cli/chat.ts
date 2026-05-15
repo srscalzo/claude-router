@@ -1,7 +1,10 @@
 import readline from 'node:readline';
 import type Anthropic from '@anthropic-ai/sdk';
 import { ClaudeRouter } from '../router';
+import { classify } from '../classifier';
+import { TIER_TO_MODEL } from '../pricing';
 import { buildContext } from './context';
+import { startSpinner } from './spinner';
 import type { RouterRunParams } from '../types';
 
 interface SessionStats {
@@ -68,15 +71,21 @@ export async function runChat(options: { model?: string; context?: boolean; logP
 
       messages.push({ role: 'user', content: trimmed });
 
+      // Classify only the latest message so conversation length doesn't inflate the tier.
+      const resolvedModel = options.model as RouterRunParams['model']
+        ?? TIER_TO_MODEL[classify({ messages: [{ role: 'user', content: trimmed }], max_tokens: 1024 }).tier];
+
       const params: RouterRunParams = {
         messages,
         max_tokens: 1024,
+        model: resolvedModel,
         ...(system && { system }),
-        ...(options.model && { model: options.model as RouterRunParams['model'] }),
       };
 
       try {
+        const stop = startSpinner('thinking');
         const response = await router.run(params);
+        stop();
 
         process.stdout.write('\nAssistant: ');
         for (const block of response.content) {

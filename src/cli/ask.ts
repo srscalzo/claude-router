@@ -1,5 +1,6 @@
 import { ClaudeRouter } from '../router';
 import { classify } from '../classifier';
+import { startSpinner } from './spinner';
 import type { RouterRunParams } from '../types';
 
 const TIER_LABEL: Record<number, string> = {
@@ -30,11 +31,12 @@ export async function runAsk(prompt: string, options: { logPath?: string; model?
   if (!options.model) {
     console.error(`\nClassified as ${TIER_LABEL[classification.tier]}`);
   }
-  console.error('Sending request...\n');
 
   const router = new ClaudeRouter({ apiKey, logPath: options.logPath });
+  const stop = startSpinner('routing');
   const start = Date.now();
   const response = await router.run(params);
+  stop();
   const latencyMs = Date.now() - start;
 
   for (const block of response.content) {
